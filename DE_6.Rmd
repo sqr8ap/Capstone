@@ -1,0 +1,44 @@
+---
+title: "DE_6"
+author: "James Siegener"
+date: "2025-02-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+gene_6 <- readxl::read_excel("gene_count_6.xls")
+```
+
+
+```{r}
+head(gene)
+```
+
+```{r}
+#install.packages("BiocManager")  # If not already installed
+#BiocManager::install("DESeq2")
+
+library(DESeq2)
+library(ggplot2)
+library(pheatmap)
+```
+
+```{r}
+
+```
+
+
+
