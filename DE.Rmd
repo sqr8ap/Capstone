@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ```{r}
-gene <- readxl::read_excel("/Users/Samantha/Desktop/gene_count_16.xls")
+gene <- readxl::read_excel("gene_count_16.xls")
 ```
 
 
@@ -31,8 +31,67 @@ library(pheatmap)
 ```
 
 ```{r}
+### Framework for conducting DE:
+
+## Load count matrix and metadata
+counts_matrix <- read.csv("gene_counts.csv", row.names = 1)
+sample_info <- read.csv("sample_metadata.csv")
+
+# Convert count matrix to numeric; need this to be a counts matrix with genes as rows, samples as columns and raw read counts as values
+counts_matrix <- as.matrix(counts_matrix)
+
+
+## Create a DESeqDataSet object
+dds <- DESeqDataSetFromMatrix(countData = counts_matrix,
+                              colData = sample_info,
+                              design = ~ condition)  # 'condition' should be a column in sample_info
+
+# Filter low-count genes (optional)
+dds <- dds[rowSums(counts(dds)) > 10, ]
+
+
+## Run DESeq analysis
+dds <- DESeq(dds)
+res <- results(dds)
+
+
+## Explore results
+
+# p values
+res <- res[order(res$padj), ]
+head(res)
+
+# Filter for Significant DEGs (Adjusted p-value < 0.05, Log2FC > 1)
+sig_genes <- subset(res, padj < 0.05 & abs(log2FoldChange) > 1)
+
+# volcano plot
+ggplot(as.data.frame(res), aes(x = log2FoldChange, y = -log10(padj))) +
+  geom_point(alpha = 0.5) +
+  geom_point(data = sig_genes, aes(x = log2FoldChange, y = -log10(padj)), color = "red") +
+  theme_minimal() +
+  xlab("Log2 Fold Change") +
+  ylab("-Log10 Adjusted P-Value") +
+  ggtitle("Volcano Plot of Differentially Expressed Genes")
+
+# Heatmap of Top Genes
+top_genes <- rownames(sig_genes)[1:50]  # Select top 50 genes
+normalized_counts <- counts(dds, normalized = TRUE)
+pheatmap(normalized_counts[top_genes, ])
+
+
+## Save results
+#write.csv(as.data.frame(res), "DEG_results.csv")
 
 ```
+
+
+
+
+
+
+
+
+
 
 
 
