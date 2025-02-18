@@ -1,0 +1,38 @@
+---
+title: "DE Analysis"
+author: "Sam Remmey"
+date: "2025-02-07"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+gene <- readxl::read_excel("/Users/Samantha/Desktop/gene_count_16.xls")
+```
+
+
+```{r}
+head(gene)
+```
+
+```{r}
+#install.packages("BiocManager")  # If not already installed
+#BiocManager::install("DESeq2")
+
+library(DESeq2)
+library(ggplot2)
+library(pheatmap)
+```
+
+```{r}
+
+```
+
+
+
