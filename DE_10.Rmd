@@ -1,0 +1,161 @@
+---
+title: "DE Analysis"
+author: "Sam Remmey"
+date: "2025-02-07"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+gene <- data.frame(readxl::read_excel("gene_count_16.xls"))
+```
+
+
+```{r}
+head(gene)
+```
+
+```{r}
+#install.packages("BiocManager")  # If not already installed
+#BiocManager::install("DESeq2")
+
+library(DESeq2)
+library(ggplot2)
+library(pheatmap)
+```
+
+```{text}
+### Framework for conducting DE:
+
+## Load count matrix and metadata
+counts_matrix <- read.csv("gene_counts.csv", row.names = 1)
+sample_info <- read.csv("sample_metadata.csv")
+
+# Convert count matrix to numeric; need this to be a counts matrix with genes as rows, samples as columns and raw read counts as values
+counts_matrix <- as.matrix(counts_matrix)
+
+
+## Create a DESeqDataSet object
+dds <- DESeqDataSetFromMatrix(countData = counts_matrix,
+                              colData = sample_info,
+                              design = ~ condition)  # 'condition' should be a column in sample_info
+
+# Filter low-count genes (optional)
+dds <- dds[rowSums(counts(dds)) > 10, ]
+
+
+## Run DESeq analysis
+dds <- DESeq(dds)
+res <- results(dds)
+
+
+## Explore results
+
+# p values
+res <- res[order(res$padj), ]
+head(res)
+
+# Filter for Significant DEGs (Adjusted p-value < 0.05, Log2FC > 1)
+sig_genes <- subset(res, padj < 0.05 & abs(log2FoldChange) > 1)
+
+# volcano plot
+ggplot(as.data.frame(res), aes(x = log2FoldChange, y = -log10(padj))) +
+  geom_point(alpha = 0.5) +
+  geom_point(data = sig_genes, aes(x = log2FoldChange, y = -log10(padj)), color = "red") +
+  theme_minimal() +
+  xlab("Log2 Fold Change") +
+  ylab("-Log10 Adjusted P-Value") +
+  ggtitle("Volcano Plot of Differentially Expressed Genes")
+
+# Heatmap of Top Genes
+top_genes <- rownames(sig_genes)[1:50]  # Select top 50 genes
+normalized_counts <- counts(dds, normalized = TRUE)
+pheatmap(normalized_counts[top_genes, ])
+
+
+## Save results
+#write.csv(as.data.frame(res), "DEG_results.csv")
+
+```
+
+
+
+### Running DE on 10 samples (8 POAG, 2 NTG):
+```{r}
+library(dplyr)
+
+counts_matrix <- gene %>%
+  select(gene_id, AD24, AD25, RNA41, RNA45, RNA47, RNA48, RNA53, RNA44, RNA54, RNA61)
+rownames(counts_matrix) <- counts_matrix$gene_id
+counts_matrix <- counts_matrix %>%
+  select(-gene_id)
+counts_matrix <- as.matrix(counts_matrix)  # Convert to numeric
+
+
+samples <- c('AD24','AD25','RNA41','RNA45','RNA47','RNA48','RNA53','RNA44','RNA54','RNA61')
+label <- c('POAG','POAG','POAG','POAG','POAG','POAG','POAG','POAG','NTG','NTG')
+labels <- data.frame(samples, label)
+rownames(labels) <- labels$samples
+labels <- labels %>%
+  select(-samples)
+```
+
+```{r}
+## Create a DESeqDataSet object
+dds <- DESeqDataSetFromMatrix(countData = counts_matrix,
+                              colData = labels,
+                              design = ~ label)  # 'condition' should be a column in sample_info
+
+# Filter low-count genes (optional)
+#dds <- dds[rowSums(counts(dds)) > 10, ]
+
+## Run DESeq analysis
+dds <- DESeq(dds)
+res <- results(dds)
+```
+
+
+```{r}
+# p values
+res <- res[order(res$padj), ]
+head(res)
+
+# Filter for Significant DEGs (Adjusted p-value < 0.05, Log2FC > 1)
+sig_genes <- subset(res, padj < 0.05 & abs(log2FoldChange) > 1)
+```
+
+```{r}
+# volcano plot
+ggplot(as.data.frame(res), aes(x = log2FoldChange, y = -log10(padj))) +
+  geom_point(alpha = 0.5) +
+  geom_point(data = sig_genes, aes(x = log2FoldChange, y = -log10(padj)), color = "red") +
+  theme_minimal() +
+  xlab("Log2 Fold Change") +
+  ylab("-Log10 Adjusted P-Value") +
+  ggtitle("Volcano Plot of Differentially Expressed Genes")
+
+```
+
+```{r}
+# Heatmap of Top Genes
+top_genes <- rownames(sig_genes)[1:50]  # Select top 50 genes
+normalized_counts <- counts(dds, normalized = TRUE)
+#pheatmap(normalized_counts[top_genes, ])
+```
+
+```{r}
+sig_genes
+```
+
+Only one gene was identified as being differentially expressed across the POAG and NTG samples. 
+
+"Mutations in this gene have been associated with a number of endothelial corneal dystrophies including recessive corneal endothelial dystrophy 2, corneal dystrophy and perceptive deafness, and Fuchs endothelial corneal dystrophy" (https://www.genecards.org/cgi-bin/carddisp.pl?gene=SLC4A11&keywords=ENSG00000088836). 
+
+
+
