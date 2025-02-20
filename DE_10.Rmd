@@ -107,7 +107,7 @@ labels <- labels %>%
 ```
 
 ```{r}
-## Create a DESeqDataSet object
+ ## Create a DESeqDataSet object
 dds <- DESeqDataSetFromMatrix(countData = counts_matrix,
                               colData = labels,
                               design = ~ label)  # 'condition' should be a column in sample_info
