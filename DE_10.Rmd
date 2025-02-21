@@ -10,7 +10,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-
+## DE on 8 POAG samples vs 3 control samples. 
 
 ```{r}
 gene <- data.frame(readxl::read_excel("gene_count_16.xls"))
@@ -30,76 +30,21 @@ library(ggplot2)
 library(pheatmap)
 ```
 
-```{text}
-### Framework for conducting DE:
 
-## Load count matrix and metadata
-counts_matrix <- read.csv("gene_counts.csv", row.names = 1)
-sample_info <- read.csv("sample_metadata.csv")
-
-# Convert count matrix to numeric; need this to be a counts matrix with genes as rows, samples as columns and raw read counts as values
-counts_matrix <- as.matrix(counts_matrix)
-
-
-## Create a DESeqDataSet object
-dds <- DESeqDataSetFromMatrix(countData = counts_matrix,
-                              colData = sample_info,
-                              design = ~ condition)  # 'condition' should be a column in sample_info
-
-# Filter low-count genes (optional)
-dds <- dds[rowSums(counts(dds)) > 10, ]
-
-
-## Run DESeq analysis
-dds <- DESeq(dds)
-res <- results(dds)
-
-
-## Explore results
-
-# p values
-res <- res[order(res$padj), ]
-head(res)
-
-# Filter for Significant DEGs (Adjusted p-value < 0.05, Log2FC > 1)
-sig_genes <- subset(res, padj < 0.05 & abs(log2FoldChange) > 1)
-
-# volcano plot
-ggplot(as.data.frame(res), aes(x = log2FoldChange, y = -log10(padj))) +
-  geom_point(alpha = 0.5) +
-  geom_point(data = sig_genes, aes(x = log2FoldChange, y = -log10(padj)), color = "red") +
-  theme_minimal() +
-  xlab("Log2 Fold Change") +
-  ylab("-Log10 Adjusted P-Value") +
-  ggtitle("Volcano Plot of Differentially Expressed Genes")
-
-# Heatmap of Top Genes
-top_genes <- rownames(sig_genes)[1:50]  # Select top 50 genes
-normalized_counts <- counts(dds, normalized = TRUE)
-pheatmap(normalized_counts[top_genes, ])
-
-
-## Save results
-#write.csv(as.data.frame(res), "DEG_results.csv")
-
-```
-
-
-
-### Running DE on 10 samples (8 POAG, 2 NTG):
+### Running DE on 11 samples (8 POAG, 3 cadaver controls):
 ```{r}
 library(dplyr)
 
 counts_matrix <- gene %>%
-  select(gene_id, AD24, AD25, RNA41, RNA45, RNA47, RNA48, RNA53, RNA44, RNA54, RNA61)
+  select(gene_id, OS0658, OS21014, OD21014, AD24, AD25, RNA41, RNA45, RNA47, RNA48, RNA53, RNA44)
 rownames(counts_matrix) <- counts_matrix$gene_id
 counts_matrix <- counts_matrix %>%
   select(-gene_id)
 counts_matrix <- as.matrix(counts_matrix)  # Convert to numeric
 
 
-samples <- c('AD24','AD25','RNA41','RNA45','RNA47','RNA48','RNA53','RNA44','RNA54','RNA61')
-label <- c('POAG','POAG','POAG','POAG','POAG','POAG','POAG','POAG','NTG','NTG')
+samples <- c('OS0658','OS21014','OD21014','AD24','AD25','RNA41','RNA45','RNA47','RNA48','RNA53','RNA44')
+label <- c('CTRL','CTRL','CTRL','POAG','POAG','POAG','POAG','POAG','POAG','POAG','POAG')
 labels <- data.frame(samples, label)
 rownames(labels) <- labels$samples
 labels <- labels %>%
@@ -127,14 +72,14 @@ res <- res[order(res$padj), ]
 head(res)
 
 # Filter for Significant DEGs (Adjusted p-value < 0.05, Log2FC > 1)
-sig_genes <- subset(res, padj < 0.05 & abs(log2FoldChange) > 1)
+sig_genes_11 <- subset(res, padj < 0.05 & abs(log2FoldChange) > 1)
 ```
 
 ```{r}
 # volcano plot
 ggplot(as.data.frame(res), aes(x = log2FoldChange, y = -log10(padj))) +
   geom_point(alpha = 0.5) +
-  geom_point(data = sig_genes, aes(x = log2FoldChange, y = -log10(padj)), color = "red") +
+  geom_point(data = sig_genes_11, aes(x = log2FoldChange, y = -log10(padj)), color = "red") +
   theme_minimal() +
   xlab("Log2 Fold Change") +
   ylab("-Log10 Adjusted P-Value") +
@@ -144,14 +89,28 @@ ggplot(as.data.frame(res), aes(x = log2FoldChange, y = -log10(padj))) +
 
 ```{r}
 # Heatmap of Top Genes
-top_genes <- rownames(sig_genes)[1:50]  # Select top 50 genes
+top_genes_11 <- rownames(sig_genes_11)[1:50]  # Select top 50 genes
+all_genes_11 <- rownames(sig_genes_11)
 normalized_counts <- counts(dds, normalized = TRUE)
-#pheatmap(normalized_counts[top_genes, ])
+pheatmap(normalized_counts[top_genes_11, ])
 ```
 
 ```{r}
-sig_genes
+top_genes_11
 ```
+
+Look at overlap between genes differentially expressed across 8 POAG (bad samples)/3 cadaver and 3 POAG (good samples)/3 cadaver:
+```{r}
+## all_genes_6 object here comes from DE_6.Rmd file
+overlap <- intersect(all_genes_6, all_genes_11)
+overlap
+```
+
+
+
+
+
+Note:
 
 Only one gene was identified as being differentially expressed across the POAG and NTG samples. 
 
