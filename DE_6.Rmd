@@ -123,9 +123,12 @@ plotPCA(vsd_6, intgroup = "condition") +
 overlap <- intersect(top_genes_6, top_genes_16)
 overlap
 
+```
+The gene that overlaps between running the analysis on all 16 genes and on just the 6 that are uncontaminated is gene ENSG00000104635. This gene is differentially expressed in both analyses. 
+```{r}
+res_6['ENSG00000104635',]
 
 ```
-
-
+This gene seems to be strongly downregulated in glaucoma patients in both the 6 sample and 16 sample dataset. 
 
 
