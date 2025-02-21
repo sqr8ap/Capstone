@@ -33,12 +33,81 @@ head(gene)
 
 library(DESeq2)
 library(ggplot2)
+library(tidyverse)
 library(pheatmap)
 ```
 
 ```{r}
+counts <- gene_6 %>% select(gene_id, OS0658, OS21014, OD21014, AD22, RNA35, RNA62)
+
+counts <- counts %>% column_to_rownames(var = "gene_id")
+
+counts <- as.matrix(counts)
+
+mode(counts) <- "numeric"
+
+sample_info <- data.frame(
+    row.names = colnames(counts),   # Sample names
+    condition = c("control", "control", "control", "glaucoma", "glaucoma", "glaucoma")  # Group labels
+)
+
+sample_info$condition <- factor(sample_info$condition, levels = c("control", "glaucoma"))
 
 ```
+
+
+```{r}
+
+dds <- DESeqDataSetFromMatrix(countData = counts,
+                              colData = sample_info,
+                              design = ~ condition)
+
+# Filter out low-expression genes
+dds <- dds[rowSums(counts(dds)) > 10, ]
+
+# Run DESeq2 normalization and differential expression analysis
+dds <- DESeq(dds)
+
+# Extract results (glaucoma vs. control)
+res <- results(dds, contrast = c("condition", "glaucoma", "control"))
+
+# View summary
+summary(res)
+
+```
+```{r}
+res_df <- as.data.frame(res) %>%
+  rownames_to_column(var = "gene") %>%   
+  drop_na()  
+
+res_df$log2FoldChange <- as.numeric(res_df$log2FoldChange)
+res_df$padj <- as.numeric(res_df$padj)
+
+ggplot(res_df, aes(x = log2FoldChange, y = -log10(padj), color = padj < 0.05)) +
+  geom_point(alpha = 0.6) +
+  scale_color_manual(values = c("black", "red")) +  # Red for significant genes
+  theme_minimal() +
+  labs(title = "Volcano Plot", x = "Log2 Fold Change", y = "-Log10 Adjusted P-value")
+
+
+```
+```{r}
+# Extract normalized counts
+vsd <- vst(dds, blind = FALSE)
+top_genes <- rownames(res)[1:25]
+
+pheatmap(assay(vsd)[top_genes, ], cluster_rows = TRUE, cluster_cols = TRUE)
+
+
+```
+```{r}
+plotPCA(vsd, intgroup = "condition") +
+  theme_minimal() +
+  ggtitle("PCA of RNA-seq Data")
+
+```
+
+
 
 
 
