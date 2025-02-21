@@ -22,11 +22,6 @@ knitr::opts_chunk$set(echo = TRUE)
 gene_6 <- readxl::read_excel("gene_count_6.xls")
 ```
 
-
-```{r}
-head(gene)
-```
-
 ```{r}
 #install.packages("BiocManager")  # If not already installed
 #BiocManager::install("DESeq2")
