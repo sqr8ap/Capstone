@@ -101,12 +101,34 @@ top_genes_11
 
 Look at overlap between genes differentially expressed across 8 POAG (bad samples)/3 cadaver and 3 POAG (good samples)/3 cadaver:
 ```{r}
-## all_genes_6 object here comes from DE_6.Rmd file
+# all_genes_6 object here comes from DE_6.Rmd file
+
+# **define the all_genes_6 variable after defining sig_genes_6 in the DE_6.Rmd file:**
+# all_genes_6 <- rownames(sig_genes_6)
+
 overlap <- intersect(all_genes_6, all_genes_11)
 overlap
 ```
 
 
+Functional enrichment analysis:
+
+```{r}
+R.version.string
+install.packages(c("httr", "jsonlite", "curl"))
+
+```
+
+```{r}
+install.packages("gprofiler2")
+
+```
+```{r}
+library(gprofiler2)
+```
+```{r}
+
+```
 
 
 
