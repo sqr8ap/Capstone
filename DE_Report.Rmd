@@ -1,0 +1,227 @@
+---
+title: "DE Full Report"
+author: "Sam Remmey, James Siegener, Jacob Turner"
+date: "2025-02-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages("BiocManager")  # If not already installed
+#BiocManager::install("DESeq2")
+
+library(tidyverse)
+library(DESeq2)
+library(ggplot2)
+library(pheatmap)
+```
+
+## Differential Expression Analysis
+
+We've conducted DE analyses on both the high confidence 6-sample subset (3 POAG, 3 cadaver) as well as an 11-sample subset we formed by combining the 3 high confidence cadaver control samples with the 8 low confidence POAG samples. This report contains results of both series of analyses as well as a list of extracted genes that were found to be differentially expressed in both subsets, followed by functional enrichment analysis conducted on this extracted set of genes. 
+
+
+### DE: 6 samples
+
+```{r}
+gene_6 <- readxl::read_excel("gene_count_6.xls")
+
+counts_6 <- gene_6 %>% select(gene_id, OS0658, OS21014, OD21014, AD22, RNA35, RNA62)
+
+counts_6 <- counts_6 %>% column_to_rownames(var = "gene_id")
+
+counts_6 <- as.matrix(counts_6)
+
+mode(counts_6) <- "numeric"
+
+sample_info_6 <- data.frame(
+    row.names = colnames(counts),   # Sample names
+    condition = c("control", "control", "control", "glaucoma", "glaucoma", "glaucoma")  # Group labels
+)
+
+sample_info_6$condition <- factor(sample_info_6$condition, levels = c("control", "glaucoma"))
+```
+
+```{r}
+dds_6 <- DESeqDataSetFromMatrix(countData = counts_6,
+                              colData = sample_info_6,
+                              design = ~ condition)
+
+# Filter out low-expression genes
+# dds_6 <- dds_6[rowSums(counts_6(dds_6)) > 10, ]
+
+# Run DESeq2 normalization and differential expression analysis
+dds_6 <- DESeq(dds_6)
+
+# Extract results (glaucoma vs. control)
+res_6 <- results(dds_6, contrast = c("condition", "glaucoma", "control"))
+
+# View summary
+summary(res_6)
+```
+
+```{r}
+sig_genes_6 <- subset(res_6, padj < 0.05 & abs(log2FoldChange) > 1)
+all_genes_6 <- rownames(sig_genes_6)
+
+head(res_6)
+```
+
+```{r}
+# Volcano plot
+res_df_6 <- as.data.frame(res_6) %>%
+  rownames_to_column(var = "gene") %>%   
+  drop_na()  
+
+res_df_6$log2FoldChange <- as.numeric(res_df_6$log2FoldChange)
+res_df_6$padj <- as.numeric(res_df_6$padj)
+
+ggplot(res_df_6, aes(x = log2FoldChange, y = -log10(padj), color = padj < 0.05)) +
+  geom_point(alpha = 0.6) +
+  scale_color_manual(values = c("black", "red")) +  # Red for significant genes
+  theme_minimal() +
+  labs(title = "Volcano Plot", x = "Log2 Fold Change", y = "-Log10 Adjusted P-value")
+
+```
+
+```{r}
+# Extract normalized counts
+vsd_6 <- vst(dds_6, blind = FALSE)
+top_genes_6 <- rownames(sig_genes_6)[1:25]
+
+# Heat map
+pheatmap(assay(vsd_6)[top_genes_6, ], cluster_rows = TRUE, cluster_cols = TRUE)
+```
+
+```{r}
+# PCA
+plotPCA(vsd_6, intgroup = "condition") +
+  theme_minimal() +
+  ggtitle("PCA of RNA-seq Data: 6 Samples")
+```
+
+
+### DE: 11 samples
+
+```{r}
+gene_16 <- data.frame(readxl::read_excel("gene_count_16.xls"))
+
+counts_matrix <- gene_16 %>%
+  select(gene_id, OS0658, OS21014, OD21014, AD24, AD25, RNA41, RNA45, RNA47, RNA48, RNA53, RNA44)
+rownames(counts_matrix) <- counts_matrix$gene_id
+counts_matrix <- counts_matrix %>%
+  select(-gene_id)
+counts_matrix <- as.matrix(counts_matrix)  # Convert to numeric
+
+
+samples <- c('OS0658','OS21014','OD21014','AD24','AD25','RNA41','RNA45','RNA47','RNA48','RNA53','RNA44')
+label <- c('CTRL','CTRL','CTRL','POAG','POAG','POAG','POAG','POAG','POAG','POAG','POAG')
+labels <- data.frame(samples, label)
+rownames(labels) <- labels$samples
+labels <- labels %>%
+  select(-samples)
+```
+
+```{r}
+ ## Create a DESeqDataSet object
+dds <- DESeqDataSetFromMatrix(countData = counts_matrix,
+                              colData = labels,
+                              design = ~ label)  # 'condition' should be a column in sample_info
+
+# Filter low-count genes (optional)
+#dds <- dds[rowSums(counts(dds)) > 10, ]
+
+## Run DESeq analysis
+dds <- DESeq(dds)
+res <- results(dds)
+```
+
+```{r}
+# p values
+res <- res[order(res$padj), ]
+head(res)
+
+# Filter for Significant DEGs (Adjusted p-value < 0.05, Log2FC > 1)
+sig_genes_11 <- subset(res, padj < 0.05 & abs(log2FoldChange) > 1)
+```
+
+```{r}
+# Volcano plot
+ggplot(as.data.frame(res), aes(x = log2FoldChange, y = -log10(padj))) +
+  geom_point(alpha = 0.5) +
+  geom_point(data = sig_genes_11, aes(x = log2FoldChange, y = -log10(padj)), color = "red") +
+  theme_minimal() +
+  xlab("Log2 Fold Change") +
+  ylab("-Log10 Adjusted P-Value") +
+  ggtitle("Volcano Plot of Differentially Expressed Genes")
+
+```
+
+```{r}
+# Heatmap of Top Genes
+top_genes_11 <- rownames(sig_genes_11)[1:25]  # Select top 25 genes
+all_genes_11 <- rownames(sig_genes_11)
+normalized_counts <- counts(dds, normalized = TRUE)
+pheatmap(normalized_counts[top_genes_11, ])
+```
+
+```{r}
+# PCA
+
+vsd_11 <- vst(dds, blind = FALSE)
+
+plotPCA(vsd_11, intgroup = "label") +
+  theme_minimal() +
+  ggtitle("PCA of RNA-seq Data: 11 Samples")
+```
+
+
+## Comparison
+
+#### Identify overlap in differentially expressed genes. 
+
+```{r}
+overlap <- intersect(all_genes_6, all_genes_11)
+length(overlap)
+```
+
+
+## Functional Enrichment Analysis
+
+```{r}
+#install.packages(c("httr", "jsonlite", "curl"))
+#install.packages("gprofiler2")
+library(gprofiler2)
+```
+
+```{r}
+# Run functional enrichment analysis
+gost_results <- gost(query = overlap, 
+                     organism = "hsapiens",  # Human genes
+                     sources = c("GO:BP", "GO:MF", "GO:CC", "KEGG", "REACTOME"), 
+                     significant = TRUE)
+
+# Print results
+head(gost_results$result)
+```
+
+```{r}
+# Extract top 10 enriched terms
+top_terms <- gost_results$result[1:10,]
+
+ggplot(top_terms, aes(x=reorder(term_name, -p_value), y=-log10(p_value))) +
+  geom_bar(stat="identity", fill="steelblue") +
+  coord_flip() +
+  labs(title="Top Enriched Terms", x="Pathway/GO Term", y="-log10(p-value)") +
+  theme_minimal()
+
+```
+
+```{r}
+# Interactive manhattan plot
+gostplot(gost_results, capped = TRUE, interactive = TRUE)
+```
+
+
+
+
