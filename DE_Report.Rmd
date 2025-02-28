@@ -217,6 +217,37 @@ length(overlap_adj)
 ```
 
 
+
+#### Make table of overlapping genes
+```{r}
+df_res6 <- data.frame(res_6)
+df_res11 <- data.frame(res)
+
+# Convert row names to a column
+df_res6$GENE <- rownames(df_res6)
+df_res11$GENE <- rownames(df_res11)
+
+# Merge
+df_overlap <- merge(df_res6, df_res11, by = "GENE", all = FALSE)  # Inner join but doesn't matter cause same in both
+
+# Now filter so that it's only the 32 overlapping genes
+df_overlap <- df_overlap[df_overlap$GENE %in% overlap_adj, ]
+
+df_overlap <- df_overlap %>%
+  dplyr::rename(baseMean.6 = baseMean.x, log2FoldChange.6 = log2FoldChange.x, lfcSE.6 = lfcSE.x, stat.6 = stat.x, pvalue.6 = pvalue.x,
+         padj.6 = padj.x, baseMean.11 = baseMean.y, log2FoldChange.11 = log2FoldChange.y, lfcSE.11 = lfcSE.y, stat.11 = stat.y,
+         pvalue.11 = pvalue.y, padj.11 = padj.y)
+```
+
+```{r}
+# Write to csv
+#write.csv(df_overlap, 'GeneOverlap.csv', row.names = F)
+```
+
+
+
+
+
 ## Functional Enrichment Analysis
 
 ```{r}
@@ -227,7 +258,7 @@ library(gprofiler2)
 
 ```{r}
 # Run functional enrichment analysis
-gost_results <- gost(query = overlap, 
+gost_results <- gost(query = overlap_adj, 
                      organism = "hsapiens",  # Human genes
                      sources = c("GO:BP", "GO:MF", "GO:CC", "KEGG", "REACTOME"), 
                      significant = TRUE)
