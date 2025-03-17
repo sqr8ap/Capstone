@@ -21,6 +21,12 @@ library(pheatmap)
 We've conducted DE analyses on both the high confidence 6-sample subset (3 POAG, 3 cadaver) as well as an 11-sample subset we formed by combining the 3 high confidence cadaver control samples with the 8 low confidence POAG samples. This report contains results of both series of analyses as well as a list of extracted genes that were found to be differentially expressed in both subsets, followed by functional enrichment analysis conducted on this extracted set of genes. 
 
 
+Global variables:
+```{r}
+p_val <- 5e-10
+```
+
+
 ### DE: 6 samples
 
 ```{r}
@@ -61,15 +67,8 @@ summary(res_6)
 ```
 
 ```{r}
-sig_genes_6 <- subset(res_6, padj < 0.05 & abs(log2FoldChange) > 1)
-all_genes_6 <- rownames(sig_genes_6)
-
-#head(res_6)
-
-
-## doing again with different p value threshold
-
-sig_genes_6_adj <- subset(res_6, pvalue < 0.0000000005 & abs(log2FoldChange) > 1)
+## Extract significant genes
+sig_genes_6_adj <- subset(res_6, pvalue < p_val & abs(log2FoldChange) > 1)
 all_genes_6_adj <- rownames(sig_genes_6_adj)
 length(all_genes_6_adj)
 ```
@@ -84,7 +83,7 @@ res_df_6$log2FoldChange <- as.numeric(res_df_6$log2FoldChange)
 res_df_6$padj <- as.numeric(res_df_6$padj)
 res_df_6$pvalue <- as.numeric(res_df_6$pvalue)
 
-ggplot(res_df_6, aes(x = log2FoldChange, y = -log10(padj), color = pvalue < 0.0000000005)) +
+ggplot(res_df_6, aes(x = log2FoldChange, y = -log10(padj), color = pvalue < p_val)) +
   geom_point(alpha = 0.6) +
   scale_color_manual(values = c("black", "red")) +  # Red for significant genes
   theme_minimal() +
@@ -95,7 +94,7 @@ ggplot(res_df_6, aes(x = log2FoldChange, y = -log10(padj), color = pvalue < 0.00
 ```{r}
 # Extract normalized counts
 vsd_6 <- vst(dds_6, blind = FALSE)
-top_genes_6 <- rownames(sig_genes_6_adj)[1:25] # top 25
+top_genes_6 <- rownames(sig_genes_6_adj)[1:10] # top 10
 
 # Heat map
 pheatmap(assay(vsd_6)[top_genes_6, ], cluster_rows = TRUE, cluster_cols = TRUE)
@@ -134,7 +133,7 @@ labels <- labels %>%
  ## Create a DESeqDataSet object
 dds <- DESeqDataSetFromMatrix(countData = counts_matrix,
                               colData = labels,
-                              design = ~ label)  # 'condition' should be a column in sample_info
+                              design = ~ label)
 
 # Filter low-count genes (optional)
 #dds <- dds[rowSums(counts(dds)) > 10, ]
@@ -149,16 +148,13 @@ res <- results(dds)
 res <- res[order(res$padj), ]
 head(res)
 
-# Filter for Significant DEGs (Adjusted p-value < 0.05, Log2FC > 1)
-sig_genes_11 <- subset(res, padj < 0.05 & abs(log2FoldChange) > 1)
-
-
-# again with different p value threshold
-sig_genes_11_adj <- subset(res, pvalue < 0.0000000005 & abs(log2FoldChange) > 1)
+# Extract significant genes
+sig_genes_11_adj <- subset(res, pvalue < p_val & abs(log2FoldChange) > 1)
 all_genes_11_adj <- rownames(sig_genes_11_adj)
 ```
 
 ```{r}
+# Compare number of significant genes from 11-sample vs 6-sample
 length(all_genes_11_adj)
 length(all_genes_6_adj)
 ```
@@ -167,7 +163,6 @@ length(all_genes_6_adj)
 
 ```{r}
 # Volcano plot
-
 res_df_11 <- as.data.frame(res) %>%
   rownames_to_column(var = "gene") %>%   
   drop_na()  
@@ -176,7 +171,7 @@ res_df_11$log2FoldChange <- as.numeric(res_df_11$log2FoldChange)
 res_df_11$padj <- as.numeric(res_df_11$padj)
 res_df_11$pvalue <- as.numeric(res_df_11$pvalue)
 
-ggplot(res_df_11, aes(x = log2FoldChange, y = -log10(padj), color = pvalue < 0.0000000005)) +
+ggplot(res_df_11, aes(x = log2FoldChange, y = -log10(padj), color = pvalue < p_val)) +
   geom_point(alpha = 0.6) +
   scale_color_manual(values = c("black", "red")) +  # Red for significant genes
   theme_minimal() +
@@ -203,6 +198,50 @@ plotPCA(vsd_11, intgroup = "label") +
 ```
 
 
+PCA again: this time add back the 3 high confidence POAG samples and run PCA on that.
+```{r}
+gene_16 <- data.frame(readxl::read_excel("gene_count_16.xls"))
+
+counts_matrix2 <- gene_16 %>%
+  select(gene_id, OS0658, OS21014, OD21014, AD22, RNA35, RNA62, AD24, AD25, RNA41, RNA45, RNA47, RNA48, RNA53, RNA44)
+rownames(counts_matrix2) <- counts_matrix2$gene_id
+counts_matrix2 <- counts_matrix2 %>%
+  select(-gene_id)
+counts_matrix2 <- as.matrix(counts_matrix2)  # Convert to numeric
+
+
+samples <- c('OS0658','OS21014','OD21014', 'AD22', 'RNA35', 'RNA62', 'AD24','AD25','RNA41','RNA45','RNA47','RNA48','RNA53','RNA44')
+label <- c('CTRL','CTRL','CTRL','POAG_HighConf','POAG_HighConf','POAG_HighConf','POAG_LowConf','POAG_LowConf','POAG_LowConf','POAG_LowConf','POAG_LowConf', 'POAG_LowConf', 'POAG_LowConf', 'POAG_LowConf')
+labels <- data.frame(samples, label)
+rownames(labels) <- labels$samples
+labels <- labels %>%
+  select(-samples)
+
+ ## Create a DESeqDataSet object
+dds2 <- DESeqDataSetFromMatrix(countData = counts_matrix2,
+                              colData = labels,
+                              design = ~ label)  # 'condition' should be a column in sample_info
+
+# Filter low-count genes (optional)
+#dds <- dds[rowSums(counts(dds)) > 10, ]
+
+## Run DESeq analysis
+dds2 <- DESeq(dds2)
+res2 <- results(dds2)
+
+```
+
+```{r}
+vsd_14 <- vst(dds2, blind = FALSE)
+
+plotPCA(vsd_14, intgroup = "label") +
+  theme_minimal() +
+  ggtitle("PCA of RNA-seq Data: 14 Samples") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  ylim(-30, 15)
+```
+
+
 ## Comparison
 
 #### Identify overlap in differentially expressed genes. 
@@ -211,7 +250,7 @@ plotPCA(vsd_11, intgroup = "label") +
 #overlap <- intersect(all_genes_6, all_genes_11)
 #length(overlap)
 
-# With different p value
+# Overlap with stricter p-value
 overlap_adj <- intersect(all_genes_6_adj, all_genes_11_adj)
 length(overlap_adj)
 ```
@@ -244,6 +283,28 @@ df_overlap <- df_overlap %>%
 #write.csv(df_overlap, 'GeneOverlap.csv', row.names = F)
 ```
 
+```{r}
+# Get most significant genes (most significant in 6-sample)
+
+df_overlap2 = df_overlap %>%
+  dplyr::rename(EnsemblGeneID = GENE) %>%
+  arrange(pvalue.6) %>%
+  mutate(DirectionOfExpression = ifelse(log2FoldChange.6 > 0, 'Upregulated', 'Downregulated')) %>%
+  select(EnsemblGeneID, DirectionOfExpression) %>%
+  head(10)
+
+
+library(knitr)
+library(dplyr)
+library(kableExtra)
+
+kable(df_overlap2, caption = "Top 10 Differentially Expressed Genes Across High- and Low-Confidence Samples") %>%
+  column_spec(1, width = "6cm", extra_css = "padding-left: 20px;") %>%
+  column_spec(2, width = "6cm", extra_css = "padding-left: 20px;") %>%
+  row_spec(0, extra_css = "padding-left: 20px; text-align: left;")
+
+
+```
 
 
 
