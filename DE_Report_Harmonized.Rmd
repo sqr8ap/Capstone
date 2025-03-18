@@ -1,0 +1,91 @@
+---
+title: 'DE Full Report: Harmonized First'
+author: "Sam Remmey, James Siegener, Jacob Turner"
+date: "2025-03-17"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages("BiocManager")  # If not already installed
+#BiocManager::install("DESeq2")
+
+library(tidyverse)
+library(DESeq2)
+library(ggplot2)
+library(pheatmap)
+library(limma)
+```
+
+Global variables:
+```{r}
+p_val <- 5e-10
+```
+
+
+### Pre-processing: harmonization
+
+```{r}
+#BiocManager::install("sva")
+#library(sva)
+```
+
+```{r}
+gene_16 <- data.frame(readxl::read_excel("gene_count_16.xls"))
+
+counts_matrix2 <- gene_16 %>%
+  select(gene_id, OS0658, OS21014, OD21014, AD22, RNA35, RNA62, AD24, AD25, RNA41, RNA45, RNA47, RNA48, RNA53, RNA44)
+rownames(counts_matrix2) <- counts_matrix2$gene_id
+counts_matrix2 <- counts_matrix2 %>%
+  select(-gene_id)
+counts_matrix2 <- as.matrix(counts_matrix2)  # Convert to numeric
+
+
+samples <- c('OS0658','OS21014','OD21014', 'AD22', 'RNA35', 'RNA62', 'AD24','AD25','RNA41','RNA45','RNA47','RNA48','RNA53','RNA44')
+label <- c('CTRL','CTRL','CTRL','POAG_HighConf','POAG_HighConf','POAG_HighConf','POAG_LowConf','POAG_LowConf','POAG_LowConf','POAG_LowConf','POAG_LowConf', 'POAG_LowConf', 'POAG_LowConf', 'POAG_LowConf')
+labels <- data.frame(samples, label)
+rownames(labels) <- labels$samples
+labels <- labels %>%
+  select(-samples)
+
+
+ ## Create a DESeqDataSet object
+dds2 <- DESeqDataSetFromMatrix(countData = counts_matrix2,
+                              colData = labels,
+                              design = ~ label) 
+```
+
+
+Apply vst()
+```{r}
+# Apply VST
+vsd_14 <- vst(dds2, blind = FALSE)
+```
+
+
+Harmonization with limma::removeBatchEffect()
+```{r}
+# Define batch vector: 1 = Contaminated (POAG_LowConf), 0 = Not Contaminated (CTRL, POAG_HighConf)
+batch <- ifelse(labels$label == "POAG_LowConf", 1, 0)
+
+# Apply batch correction to the VST-transformed data
+assay(vsd_14) <- removeBatchEffect(assay(vsd_14), batch = batch)
+
+```
+
+
+Visualize PCA plot after harmonization
+```{r}
+plotPCA(vsd_14, intgroup = "label") +
+  theme_minimal() +
+  ggtitle("PCA of RNA-seq Data After Harmonization") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+
+
+
+
+
+
