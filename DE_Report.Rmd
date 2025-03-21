@@ -314,9 +314,11 @@ for (p in p_value_list){
 
 ```{r}
 jacc$p_val <- factor(jacc$p_val)
-ggplot(jacc, aes(x=p_val, y=jaccard_sim))+
+ggplot(jacc, aes(x=p_val, y=jaccard_sim, size=length_overlap))+
   geom_point()+
-  theme_minimal()
+  theme_minimal()+
+  labs(title='Jaccard Similarity versus P-value', x='P-value', y='Jaccard Similarity')+
+  theme(plot.title = element_text(hjust = 0.5))
 ```
 
 
