@@ -256,6 +256,22 @@ length(overlap_adj)
 ```
 
 
+#### Jaccard similarity
+```{r}
+# Calculate the intersection and union of the sets
+intersection <- length(overlap_adj)
+union <- length(union(all_genes_6_adj, all_genes_11_adj))
+
+# Calculate Jaccard Similarity
+jaccard_similarity <- intersection / union
+jaccard_similarity
+
+```
+
+
+From here, change significance level for genes in the contaminated subset (make stricter) to yield fewer genes. 
+Change to 5e-20. Maybe want to find p-value that maximizes Jaccard similarity?
+
 
 #### Make table of overlapping genes
 ```{r}
