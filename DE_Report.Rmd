@@ -270,7 +270,57 @@ jaccard_similarity
 
 
 From here, change significance level for genes in the contaminated subset (make stricter) to yield fewer genes. 
-Change to 5e-20. Maybe want to find p-value that maximizes Jaccard similarity?
+Change to 5e-20. Maybe want to find p-value that maximizes Jaccard similarity? Want to determine if the same genes shown significant in the high-confidence set is also present at high significant in the contaminated set, just maybe buried under contamination/noise. 
+
+
+Use p-value of 5e-20 to extract significant genes, then calculate Jaccard similarity again:
+```{r}
+p_val <- 5e-20
+
+# Extract significant genes
+sig_genes_11_adj2 <- subset(res, pvalue < p_val & abs(log2FoldChange) > 1)
+all_genes_11_adj2 <- rownames(sig_genes_11_adj2)
+
+# Get overlap
+overlap_adj2 <- intersect(all_genes_6_adj, all_genes_11_adj2)
+length(overlap_adj2)
+
+# Get Jaccard similarity
+intersection <- length(overlap_adj2)
+union <- length(union(all_genes_6_adj, all_genes_11_adj2))
+jaccard_similarity <- intersection / union
+jaccard_similarity
+```
+
+
+```{r}
+p_value_list = c(5e-6, 5e-8, 5e-10, 5e-12, 5e-14, 5e-16, 5e-18, 5e-20, 5e-22, 5e-24, 5e-26)
+jacc <- data.frame('p_val'=numeric(), 'length_overlap'=numeric(), 'jaccard_sim'=numeric())
+
+for (p in p_value_list){
+  sig_genes_11_adjj <- subset(res, pvalue < p & abs(log2FoldChange) > 1)
+  all_genes_11_adjj <- rownames(sig_genes_11_adjj)
+  
+  overlap_adjj <- intersect(all_genes_6_adj, all_genes_11_adjj)
+  
+  intersection <- length(overlap_adjj)
+  union <- length(union(all_genes_6_adj, all_genes_11_adjj))
+  jaccard_similarity <- intersection / union
+  
+  new <- data.frame('p_val' = p, 'length_overlap'=union, 'jaccard_sim'=jaccard_similarity)
+  jacc <- rbind(jacc, new)
+}
+```
+
+```{r}
+jacc$p_val <- factor(jacc$p_val)
+ggplot(jacc, aes(x=p_val, y=jaccard_sim))+
+  geom_point()+
+  theme_minimal()
+```
+
+
+
 
 
 #### Make table of overlapping genes
