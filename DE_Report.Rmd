@@ -270,7 +270,7 @@ jaccard_similarity
 
 
 From here, change significance level for genes in the contaminated subset (make stricter) to yield fewer genes. 
-Change to 5e-20. Maybe want to find p-value that maximizes Jaccard similarity? Want to determine if the same genes shown significant in the high-confidence set is also present at high significant in the contaminated set, just maybe buried under contamination/noise. 
+Change to 5e-20. Maybe want to find p-value that maximizes Jaccard similarity? Want to determine if the same genes shown significant in the high-confidence set are also present at high significance in the contaminated set, just maybe buried under contamination/noise. 
 
 
 Use p-value of 5e-20 to extract significant genes, then calculate Jaccard similarity again:
