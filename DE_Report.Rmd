@@ -346,6 +346,43 @@ df_overlap <- df_overlap %>%
 ```
 
 ```{r}
+
+filtered_6 <- df_res6 %>% filter(GENE %in% overlap_adj)
+filtered_11 <- df_res11 %>% filter(GENE %in% overlap_adj)
+
+filtered_6$confidence <- "High"
+filtered_11$confidence <- "Low"
+
+
+overlap_data <- bind_rows(filtered_6, filtered_11)
+
+
+overlap_data <- overlap_data %>%
+  group_by(GENE) %>%
+  filter(n() == 2) %>%  
+  filter(all(log2FoldChange > 0) | all(log2FoldChange < 0)) %>% 
+  ungroup()
+
+
+```
+
+
+```{r}
+
+ggplot(overlap_data, aes(x = log2FoldChange, y = -log10(padj), color = as.factor(confidence))) +
+  geom_point(alpha = 0.5) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", linewidth = 1) + 
+  scale_color_manual(values = c("High" = "blue", "Low" = "red")) +
+  theme_minimal() +
+  xlab("Log2 Fold Change") +
+  ylab("-Log10 Adjusted P-Value") +
+  ggtitle("Volcano Plot of Differentially Expressed Genes") +
+  labs(color = "Confidence Level")
+
+
+```
+
+```{r}
 # Write to csv
 #write.csv(df_overlap, 'GeneOverlap.csv', row.names = F)
 ```
