@@ -1,1 +1,8 @@
-## MSDS Capstone: Data Science Approaches to Differential Gene Expression in Glaucoma
+# MSDS Capstone
+
+## Data Science Approaches to Differential Gene Expression in Glaucoma
+
+Contributors:
+- Sam Remmey
+- James Siegener
+- Jacob Turner
