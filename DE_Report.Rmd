@@ -324,7 +324,6 @@ ggplot(jacc, aes(x=p_val, y=jaccard_sim, size=length_overlap))+
 
 
 
-
 #### Make table of overlapping genes
 ```{r}
 df_res6 <- data.frame(res_6)
@@ -375,6 +374,23 @@ kable(df_overlap2, caption = "Top 10 Differentially Expressed Genes Across High-
 ```
 
 
+#### Correlating DE results
+
+Follow this up with heat maps. 
+
+```{r}
+# Overlap - significant in both
+cor(dat$baseMean.6, dat$baseMean.11) # 0.99
+ggplot(dat, aes(x=baseMean.6, y=baseMean.11))+geom_point()
+
+# All genes
+cor(df_res6$baseMean, df_res11$baseMean) # 0.01
+
+# Only genes significantly differentially expressed in 6 samples
+only6_6 <- df_res6[rownames(df_res6) %in% all_genes_6_adj, ]
+only6_11 <- df_res11[rownames(df_res6) %in% all_genes_6_adj, ]
+cor(only6_6$baseMean, only6_11$baseMean) # 0.15
+```
 
 
 ## Functional Enrichment Analysis
