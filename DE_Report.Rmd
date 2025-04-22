@@ -7,21 +7,22 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-#install.packages("BiocManager")  # If not already installed
+#install.packages("BiocManager")
 #BiocManager::install("DESeq2")
+#BiocManager::install("org.Hs.eg.db")
 #install.packages(c("httr", "jsonlite", "curl"))
 #install.packages("gprofiler2")
 
 library(tidyverse)
 library(DESeq2)
 library(ggplot2)
-library(dplyr)
 library(pheatmap)
 library(ggrepel)
 library(tibble)
 library(knitr)
 library(kableExtra)
 library(gprofiler2)
+library(dplyr)
 ```
 
 ## Differential Expression Analysis
@@ -543,6 +544,7 @@ ggplot(overlap_data, aes(x = log2FoldChange, y = -log10(pvalue), color = as.fact
   theme(plot.title = element_text(hjust = 0.5)) +
   labs(color = "Confidence Level")
 ```
+
 The above plot contains a point for each gene that was found to be significantly differentially expressed in both the high- and low-confidence subsets. There are 32 of these genes in total. 
 
 
@@ -638,27 +640,42 @@ gostplot(gost_results2, capped = TRUE, interactive = TRUE)
 ## GWAS Comparison
 ```{r}
 library(org.Hs.eg.db)
+
 POAG_associated_genes <- read.delim("EFO_0004190_associations_export.tsv")
-#Rename significant our gene data sets for clarity 
+# Rename significant our gene data sets for clarity 
 ensemble_genes_6 <- all_genes_6_adj
 ensemble_genes_11 <- all_genes_11_adj
 
-#Convert ensemble gene codes to actual gene names
+# Convert ensemble gene codes to actual gene names
 gene_names_6 <- AnnotationDbi::select(org.Hs.eg.db, keys = ensemble_genes_6, columns = "SYMBOL", keytype = "ENSEMBL")
 gene_names_11 <- AnnotationDbi::select(org.Hs.eg.db, keys = ensemble_genes_11, columns = "SYMBOL", keytype = "ENSEMBL")
 
-#Get the unique genes from the GWAS study that are significantly differentially expressed at the significance level we are using (5e-8)
-significant_GWAS_genes <- POAG_associated_genes[POAG_associated_genes$pValue <= 5e-8, ]
+# Get the unique genes from the GWAS study that are significantly differentially expressed at the significance level we are using (5e-10)
+significant_GWAS_genes <- POAG_associated_genes[POAG_associated_genes$pValue <= 5e-10, ]
 split_genes <- significant_GWAS_genes %>%
   separate_rows(mappedGenes, sep= ",")
 split_genes$mappedGenes <- trimws(split_genes$mappedGenes)
 unique_genes <- unique(split_genes$mappedGenes)
 
-#Find the overlap between the genes we identified and the genes from the GWAS study
+# Find the overlap between the genes we identified and the genes from the GWAS study
 common_genes_6 <- intersect(unique_genes, gene_names_6$SYMBOL)
 common_genes_11 <- intersect(unique_genes, gene_names_11$SYMBOL)
 common_genes <- intersect(common_genes_11, common_genes_6)
 ```
 
+Print out the genes:
+```{r}
+# 6 sample
+common_genes_6
+```
 
+```{r}
+# 11 sample
+common_genes_11
+```
+
+```{r}
+# Overlap
+common_genes
+```
 
