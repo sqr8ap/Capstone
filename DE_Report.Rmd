@@ -597,7 +597,7 @@ top_terms <- gost_results$result[1:10,]
 ggplot(top_terms, aes(x=reorder(term_name, -p_value), y=-log10(p_value))) +
   geom_bar(stat="identity", fill="steelblue") +
   coord_flip() +
-  labs(title="Top Enriched Terms: Overlap in High- and Low-Confidence Samples", x="Pathway/GO Term", y="-log10(p-value)") +
+  labs(title="Top Enriched Terms: Overlap in \nHigh- and Low-Confidence Samples", x="Pathway/GO Term", y="-log10(p-value)") +
   theme_minimal()
 
 ```
