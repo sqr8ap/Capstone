@@ -540,7 +540,7 @@ ggplot(overlap_data, aes(x = log2FoldChange, y = -log10(pvalue), color = as.fact
   theme_minimal() +
   xlab("Log2 Fold Change") +
   ylab("-Log10 P-Value") +
-  ggtitle("Volcano Plot of Differentially Expressed Genes") +
+  ggtitle("Volcano Plot of Differentially Expressed Genes: \nSignificant in both High- and Low-Confidence Samples") +
   theme(plot.title = element_text(hjust = 0.5)) +
   labs(color = "Confidence Level")
 ```
