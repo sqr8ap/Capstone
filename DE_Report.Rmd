@@ -1,7 +1,7 @@
 ---
 title: "DE Full Report"
 author: "Sam Remmey, James Siegener, Jacob Turner"
-date: "2025-02-26"
+date: "May 2, 2025"
 output: html_document
 ---
 
@@ -9,11 +9,19 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 #install.packages("BiocManager")  # If not already installed
 #BiocManager::install("DESeq2")
+#install.packages(c("httr", "jsonlite", "curl"))
+#install.packages("gprofiler2")
 
 library(tidyverse)
 library(DESeq2)
 library(ggplot2)
+library(dplyr)
 library(pheatmap)
+library(ggrepel)
+library(tibble)
+library(knitr)
+library(kableExtra)
+library(gprofiler2)
 ```
 
 ## Differential Expression Analysis
@@ -23,6 +31,7 @@ We've conducted DE analyses on both the high confidence 6-sample subset (3 POAG,
 
 Global variables:
 ```{r}
+# Threshold for significance: p-value of 5e-10 is commonly used
 p_val <- 5e-10
 ```
 
@@ -73,38 +82,107 @@ all_genes_6_adj <- rownames(sig_genes_6_adj)
 length(all_genes_6_adj)
 ```
 
+
 ```{r}
-# Volcano plot
+logfc_thresh <- 1  # threshold for large fold change
+
+# Prepare data
 res_df_6 <- as.data.frame(res_6) %>%
-  rownames_to_column(var = "gene") %>%   
-  drop_na()  
+  rownames_to_column(var = "gene") %>%
+  drop_na() %>%
+  mutate(
+    log2FoldChange = as.numeric(log2FoldChange),
+    padj = as.numeric(padj),
+    pvalue = as.numeric(pvalue),
+    neg_log10_pvalue = -log10(pvalue),
+    sig = case_when(
+      pvalue < p_val ~ "Significant",  # using pvalue rather than padj because our manually set p_val is very strict
+      TRUE ~ "Not Significant"))
 
-res_df_6$log2FoldChange <- as.numeric(res_df_6$log2FoldChange)
-res_df_6$padj <- as.numeric(res_df_6$padj)
-res_df_6$pvalue <- as.numeric(res_df_6$pvalue)
+# Label the top genes
+topp_genes <- res_df_6 %>%
+  filter(pvalue < p_val) %>%
+  top_n(-10, pvalue)  # 10 genes with smallest p-values
 
-ggplot(res_df_6, aes(x = log2FoldChange, y = -log10(padj), color = pvalue < p_val)) +
-  geom_point(alpha = 0.6) +
-  scale_color_manual(values = c("black", "red")) +  # Red for significant genes
-  theme_minimal() +
-  labs(title = "Volcano Plot", x = "Log2 Fold Change", y = "-Log10 Adjusted P-value")
+# Volcano plot
+ggplot(res_df_6, aes(x = log2FoldChange, y = neg_log10_pvalue, color = sig)) +
+  geom_point(alpha = 0.7, size = 1.5) +
+  scale_color_manual(values = c(
+    "Significant" = "red",
+    "Not Significant" = "grey60")) +
+  geom_text_repel(
+    data = topp_genes,
+    aes(label = gene),
+    size = 3,
+    max.overlaps = 10,
+    box.padding = 0.3,
+    point.padding = 0.2,
+    segment.color = 'grey50') +
+  geom_hline(yintercept = -log10(p_val), linetype = "dashed", color = "gray40") +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "Volcano Plot of Differential Gene Expression: 6 Samples",
+    x = "Log2 Fold Change",
+    y = "-Log10 P-value",
+    color = "Significance:") +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    legend.position = "top")
 
 ```
 
-```{r}
-# Extract normalized counts
-vsd_6 <- vst(dds_6, blind = FALSE)
-top_genes_6 <- rownames(sig_genes_6_adj)[1:10] # top 10
 
-# Heat map
-pheatmap(assay(vsd_6)[top_genes_6, ], cluster_rows = TRUE, cluster_cols = TRUE)
+```{r}
+# Ensure top genes match the volcano plot
+topp_genes_6 <- topp_genes$gene  # pulled from volcano plot step
+
+# Extract normalized expression matrix
+vsd_6 <- vst(dds_6, blind = FALSE)  # DESeq2 object → variance-stabilized matrix
+vsd_mat <- assay(vsd_6)
+
+# Subset matrix for top genes
+heatmap_data <- vsd_mat[topp_genes_6, ]
+
+# Z-score normalize across samples for better visual contrast
+heatmap_scaled <- t(scale(t(heatmap_data)))
+
+# Build heatmap with labels and title
+pheatmap(
+  mat = heatmap_scaled,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  color = colorRampPalette(c("navy", "white", "firebrick3"))(100),
+  main = "Heatmap of Top 10 Most Significant Genes: 6 Samples",
+  fontsize_row = 10,
+  fontsize_col = 10,
+  border_color = NA,
+  show_rownames = TRUE,
+  show_colnames = TRUE,
+  labels_row = topp_genes_6)
+
 ```
 
 ```{r}
 # PCA
-plotPCA(vsd_6, intgroup = "condition") +
-  theme_minimal() +
-  ggtitle("PCA of RNA-seq Data: 6 Samples")
+
+# Run PCA
+pcaData <- plotPCA(vsd_6, intgroup = "condition", returnData = TRUE)
+
+# Calculate % variance explained by PC1 and PC2
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+
+# Plot
+ggplot(pcaData, aes(x = PC1, y = PC2, color = condition)) +
+  geom_point(size = 4, alpha = 0.8) +
+  xlab(paste0("PC1: ", percentVar[1], "% variance")) +
+  ylab(paste0("PC2: ", percentVar[2], "% variance")) +
+  ggtitle("PCA of RNA-seq Expression (6 Samples)") +
+  theme_minimal(base_size = 14) +
+  scale_color_manual(values = c("glaucoma" = "firebrick3", "control" = "navy")) +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.title = element_blank())
+
 ```
 
 
@@ -122,7 +200,7 @@ counts_matrix <- as.matrix(counts_matrix)  # Convert to numeric
 
 
 samples <- c('OS0658','OS21014','OD21014','AD24','AD25','RNA41','RNA45','RNA47','RNA48','RNA53','RNA44')
-label <- c('CTRL','CTRL','CTRL','POAG','POAG','POAG','POAG','POAG','POAG','POAG','POAG')
+label <- c('control','control','control','glaucoma','glaucoma','glaucoma','glaucoma','glaucoma','glaucoma','glaucoma','glaucoma')
 labels <- data.frame(samples, label)
 rownames(labels) <- labels$samples
 labels <- labels %>%
@@ -145,7 +223,7 @@ res <- results(dds)
 
 ```{r}
 # p values
-res <- res[order(res$padj), ]
+res <- res[order(res$pvalue), ]
 head(res)
 
 # Extract significant genes
@@ -159,42 +237,109 @@ length(all_genes_11_adj)
 length(all_genes_6_adj)
 ```
 
+Note the huge difference in number of significant genes here. This result suggests expression in the 11-sample subset may contain a lot of noise. 
 
 
 ```{r}
-# Volcano plot
+logfc_thresh <- 1  # threshold for large fold change
+
+# Prepare data
 res_df_11 <- as.data.frame(res) %>%
-  rownames_to_column(var = "gene") %>%   
-  drop_na()  
+  rownames_to_column(var = "gene") %>%
+  drop_na() %>%
+  mutate(
+    log2FoldChange = as.numeric(log2FoldChange),
+    padj = as.numeric(padj),
+    pvalue = as.numeric(pvalue),
+    neg_log10_pvalue = -log10(pvalue),
+    sig = case_when(
+      pvalue < p_val ~ "Significant",  # using pvalue rather than padj because our manually set p_val is very strict
+      TRUE ~ "Not Significant"))
 
-res_df_11$log2FoldChange <- as.numeric(res_df_11$log2FoldChange)
-res_df_11$padj <- as.numeric(res_df_11$padj)
-res_df_11$pvalue <- as.numeric(res_df_11$pvalue)
+# Label the top genes
+topp_genes11 <- res_df_11 %>%
+  filter(pvalue < p_val) %>%
+  top_n(-10, pvalue)  # 10 genes with smallest p-values
 
-ggplot(res_df_11, aes(x = log2FoldChange, y = -log10(padj), color = pvalue < p_val)) +
-  geom_point(alpha = 0.6) +
-  scale_color_manual(values = c("black", "red")) +  # Red for significant genes
-  theme_minimal() +
-  labs(title = "Volcano Plot", x = "Log2 Fold Change", y = "-Log10 Adjusted P-value")
+# Volcano plot
+ggplot(res_df_11, aes(x = log2FoldChange, y = neg_log10_pvalue, color = sig)) +
+  geom_point(alpha = 0.7, size = 1.5) +
+  scale_color_manual(values = c(
+    "Significant" = "red",
+    "Not Significant" = "grey60")) +
+  geom_text_repel(
+    data = topp_genes11,
+    aes(label = gene),
+    size = 3,
+    max.overlaps = 20,
+    box.padding = 0.3,
+    point.padding = 0.2,
+    segment.color = 'grey50') +
+  geom_hline(yintercept = -log10(p_val), linetype = "dashed", color = "gray40") +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "Volcano Plot of Differential Gene Expression: 11 Samples",
+    x = "Log2 Fold Change",
+    y = "-Log10 P-value",
+    color = "Significance:") +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    legend.position = "top")
+
 
 ```
 
 ```{r}
-# Heatmap of Top Genes
-top_genes_11 <- rownames(sig_genes_11_adj)[1:25]  # top 25 genes
-all_genes_11 <- rownames(sig_genes_11_adj)
-normalized_counts <- counts(dds, normalized = TRUE)
-pheatmap(normalized_counts[top_genes_11, ])
+# Ensure top genes match the volcano plot
+topp_genes_11 <- topp_genes11$gene  # pulled from volcano plot step
+
+# Extract normalized expression matrix
+vsd_11 <- vst(dds, blind = FALSE)  # DESeq2 object → variance-stabilized matrix
+vsd_mat11 <- assay(vsd_11)
+
+# Subset matrix for top genes
+heatmap_data11 <- vsd_mat11[topp_genes_11, ]
+
+# Z-score normalize across samples for better visual contrast
+heatmap_scaled11 <- t(scale(t(heatmap_data11)))
+
+# Build heatmap with labels and title
+pheatmap(
+  mat = heatmap_scaled11,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  color = colorRampPalette(c("navy", "white", "firebrick3"))(100),
+  main = "Heatmap of Top 10 Most Significant Genes: 11 Samples",
+  fontsize_row = 10,
+  fontsize_col = 10,
+  border_color = NA,
+  show_rownames = TRUE,
+  show_colnames = TRUE,
+  labels_row = topp_genes_11)
+
 ```
+
 
 ```{r}
 # PCA
 
-vsd_11 <- vst(dds, blind = FALSE)
+# Run PCA
+pcaData11 <- plotPCA(vsd_11, intgroup = "label", returnData = TRUE)
 
-plotPCA(vsd_11, intgroup = "label") +
-  theme_minimal() +
-  ggtitle("PCA of RNA-seq Data: 11 Samples")
+# Calculate % variance explained by PC1 and PC2
+percentVar <- round(100 * attr(pcaData11, "percentVar"))
+
+# Plot
+ggplot(pcaData11, aes(x = PC1, y = PC2, color = label)) +
+  geom_point(size = 4, alpha = 0.8) +
+  xlab(paste0("PC1: ", percentVar[1], "% variance")) +
+  ylab(paste0("PC2: ", percentVar[2], "% variance")) +
+  ggtitle("PCA of RNA-seq Expression (11 Samples)") +
+  theme_minimal(base_size = 14) +
+  scale_color_manual(values = c("glaucoma" = "firebrick3", "control" = "navy")) +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.title = element_blank())
 ```
 
 
@@ -211,7 +356,7 @@ counts_matrix2 <- as.matrix(counts_matrix2)  # Convert to numeric
 
 
 samples <- c('OS0658','OS21014','OD21014', 'AD22', 'RNA35', 'RNA62', 'AD24','AD25','RNA41','RNA45','RNA47','RNA48','RNA53','RNA44')
-label <- c('CTRL','CTRL','CTRL','POAG_HighConf','POAG_HighConf','POAG_HighConf','POAG_LowConf','POAG_LowConf','POAG_LowConf','POAG_LowConf','POAG_LowConf', 'POAG_LowConf', 'POAG_LowConf', 'POAG_LowConf')
+label <- c('control','control','control','POAG_HighConf','POAG_HighConf','POAG_HighConf','POAG_LowConf','POAG_LowConf','POAG_LowConf','POAG_LowConf','POAG_LowConf', 'POAG_LowConf', 'POAG_LowConf', 'POAG_LowConf')
 labels <- data.frame(samples, label)
 rownames(labels) <- labels$samples
 labels <- labels %>%
@@ -220,7 +365,7 @@ labels <- labels %>%
  ## Create a DESeqDataSet object
 dds2 <- DESeqDataSetFromMatrix(countData = counts_matrix2,
                               colData = labels,
-                              design = ~ label)  # 'condition' should be a column in sample_info
+                              design = ~ label)
 
 # Filter low-count genes (optional)
 #dds <- dds[rowSums(counts(dds)) > 10, ]
@@ -247,10 +392,7 @@ plotPCA(vsd_14, intgroup = "label") +
 #### Identify overlap in differentially expressed genes. 
 
 ```{r}
-#overlap <- intersect(all_genes_6, all_genes_11)
-#length(overlap)
-
-# Overlap with stricter p-value
+# Overlap with strict p-value
 overlap_adj <- intersect(all_genes_6_adj, all_genes_11_adj)
 length(overlap_adj)
 ```
@@ -269,8 +411,9 @@ jaccard_similarity
 ```
 
 
-From here, change significance level for genes in the contaminated subset (make stricter) to yield fewer genes. 
-Change to 5e-20. Maybe want to find p-value that maximizes Jaccard similarity? Want to determine if the same genes shown significant in the high-confidence set are also present at high significance in the contaminated set, just maybe buried under contamination/noise. 
+From here, we will change the significance level for genes in the contaminated subset (make stricter) to yield fewer genes. 
+
+Maybe we want to find the p-value that maximizes Jaccard similarity? We want to determine if the same genes that are significant in the high-confidence set are also present at high significance in the contaminated set, just maybe buried under contamination/noise. 
 
 
 Use p-value of 5e-20 to extract significant genes, then calculate Jaccard similarity again:
@@ -293,6 +436,7 @@ jaccard_similarity
 ```
 
 
+Now we will iterate over several p-value thresholds. 
 ```{r}
 p_value_list = c(5e-6, 5e-8, 5e-10, 5e-12, 5e-14, 5e-16, 5e-18, 5e-20, 5e-22, 5e-24, 5e-26)
 jacc <- data.frame('p_val'=numeric(), 'length_overlap'=numeric(), 'jaccard_sim'=numeric())
@@ -322,8 +466,6 @@ ggplot(jacc, aes(x=p_val, y=jaccard_sim, size=length_overlap))+
 ```
 
 
-
-
 #### Make table of overlapping genes
 ```{r}
 df_res6 <- data.frame(res_6)
@@ -345,42 +487,6 @@ df_overlap <- df_overlap %>%
          pvalue.11 = pvalue.y, padj.11 = padj.y)
 ```
 
-```{r}
-
-filtered_6 <- df_res6 %>% filter(GENE %in% overlap_adj)
-filtered_11 <- df_res11 %>% filter(GENE %in% overlap_adj)
-
-filtered_6$confidence <- "High"
-filtered_11$confidence <- "Low"
-
-
-overlap_data <- bind_rows(filtered_6, filtered_11)
-
-
-overlap_data <- overlap_data %>%
-  group_by(GENE) %>%
-  filter(n() == 2) %>%  
-  filter(all(log2FoldChange > 0) | all(log2FoldChange < 0)) %>% 
-  ungroup()
-
-
-```
-
-
-```{r}
-
-ggplot(overlap_data, aes(x = log2FoldChange, y = -log10(padj), color = as.factor(confidence))) +
-  geom_point(alpha = 0.5) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "black", linewidth = 1) + 
-  scale_color_manual(values = c("High" = "blue", "Low" = "red")) +
-  theme_minimal() +
-  xlab("Log2 Fold Change") +
-  ylab("-Log10 Adjusted P-Value") +
-  ggtitle("Volcano Plot of Differentially Expressed Genes") +
-  labs(color = "Confidence Level")
-
-
-```
 
 ```{r}
 # Write to csv
@@ -397,11 +503,6 @@ df_overlap2 = df_overlap %>%
   select(EnsemblGeneID, DirectionOfExpression) %>%
   head(10)
 
-
-library(knitr)
-library(dplyr)
-library(kableExtra)
-
 kable(df_overlap2, caption = "Top 10 Differentially Expressed Genes Across High- and Low-Confidence Samples") %>%
   column_spec(1, width = "6cm", extra_css = "padding-left: 20px;") %>%
   column_spec(2, width = "6cm", extra_css = "padding-left: 20px;") %>%
@@ -411,14 +512,47 @@ kable(df_overlap2, caption = "Top 10 Differentially Expressed Genes Across High-
 ```
 
 
-#### Correlating DE results
+Another volcano plot:
+```{r}
+filtered_6 <- df_res6 %>% filter(GENE %in% overlap_adj)
+filtered_11 <- df_res11 %>% filter(GENE %in% overlap_adj)
 
-Follow this up with heat maps. 
+filtered_6$confidence <- "High (6 Samples)"
+filtered_11$confidence <- "Low (11 Samples)"
+
+
+overlap_data <- bind_rows(filtered_6, filtered_11)
+
+
+overlap_data <- overlap_data %>%
+  group_by(GENE) %>%
+  filter(n() == 2) %>%  
+  filter(all(log2FoldChange > 0) | all(log2FoldChange < 0)) %>% 
+  ungroup()
+```
 
 ```{r}
+ggplot(overlap_data, aes(x = log2FoldChange, y = -log10(pvalue), color = as.factor(confidence))) +
+  geom_point(alpha = 0.5) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", linewidth = 1) + 
+  scale_color_manual(values = c("High (6 Samples)" = "blue", "Low (11 Samples)" = "red")) +
+  theme_minimal() +
+  xlab("Log2 Fold Change") +
+  ylab("-Log10 P-Value") +
+  ggtitle("Volcano Plot of Differentially Expressed Genes") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs(color = "Confidence Level")
+```
+The above plot contains a point for each gene that was found to be significantly differentially expressed in both the high- and low-confidence subsets. There are 32 of these genes in total. 
+
+
+#### Correlating DE results
+
+```{r}
+dat <- read.csv('GeneOverlap.csv')
+
 # Overlap - significant in both
 cor(dat$baseMean.6, dat$baseMean.11) # 0.99
-ggplot(dat, aes(x=baseMean.6, y=baseMean.11))+geom_point()
 
 # All genes
 cor(df_res6$baseMean, df_res11$baseMean) # 0.01
@@ -430,6 +564,11 @@ cor(only6_6$baseMean, only6_11$baseMean) # 0.15
 ```
 
 
+```{r}
+# Genes significant across 6 samples and 11 samples
+ggplot(dat, aes(x=baseMean.6, y=baseMean.11))+geom_point()+theme_minimal()
+```
+
 ## Functional Enrichment Analysis
 
 ```{r}
@@ -440,7 +579,7 @@ library(gprofiler2)
 
 ```{r}
 # Run functional enrichment analysis
-gost_results <- gost(query = overlap_adj, 
+gost_results <- gost(query = overlap_adj, # 32 overlapping genes
                      organism = "hsapiens",  # Human genes
                      sources = c("GO:BP", "GO:MF", "GO:CC", "KEGG", "REACTOME"), 
                      significant = TRUE)
@@ -456,7 +595,7 @@ top_terms <- gost_results$result[1:10,]
 ggplot(top_terms, aes(x=reorder(term_name, -p_value), y=-log10(p_value))) +
   geom_bar(stat="identity", fill="steelblue") +
   coord_flip() +
-  labs(title="Top Enriched Terms", x="Pathway/GO Term", y="-log10(p-value)") +
+  labs(title="Top Enriched Terms: Overlap in High- and Low-Confidence Samples", x="Pathway/GO Term", y="-log10(p-value)") +
   theme_minimal()
 
 ```
@@ -466,6 +605,60 @@ ggplot(top_terms, aes(x=reorder(term_name, -p_value), y=-log10(p_value))) +
 gostplot(gost_results, capped = TRUE, interactive = TRUE)
 ```
 
+
+Now again with only genes significant in high confidence (6 sample) subset. 
+```{r}
+# Run functional enrichment analysis
+gost_results2 <- gost(query = all_genes_6_adj, # 64 genes
+                     organism = "hsapiens",  # Human genes
+                     sources = c("GO:BP", "GO:MF", "GO:CC", "KEGG", "REACTOME"), 
+                     significant = TRUE)
+
+# Print results
+head(gost_results2$result)
+```
+
+```{r}
+# Extract top 10 enriched terms
+top_terms2 <- gost_results2$result[1:10,]
+
+ggplot(top_terms2, aes(x=reorder(term_name, -p_value), y=-log10(p_value))) +
+  geom_bar(stat="identity", fill="steelblue") +
+  coord_flip() +
+  labs(title="Top Enriched Terms: High Confidence Samples Only", x="Pathway/GO Term", y="-log10(p-value)") +
+  theme_minimal()
+```
+
+```{r}
+# Interactive manhattan plot
+gostplot(gost_results2, capped = TRUE, interactive = TRUE)
+```
+
+
+## GWAS Comparison
+```{r}
+library(org.Hs.eg.db)
+POAG_associated_genes <- read.delim("EFO_0004190_associations_export.tsv")
+#Rename significant our gene data sets for clarity 
+ensemble_genes_6 <- all_genes_6_adj
+ensemble_genes_11 <- all_genes_11_adj
+
+#Convert ensemble gene codes to actual gene names
+gene_names_6 <- AnnotationDbi::select(org.Hs.eg.db, keys = ensemble_genes_6, columns = "SYMBOL", keytype = "ENSEMBL")
+gene_names_11 <- AnnotationDbi::select(org.Hs.eg.db, keys = ensemble_genes_11, columns = "SYMBOL", keytype = "ENSEMBL")
+
+#Get the unique genes from the GWAS study that are significantly differentially expressed at the significance level we are using (5e-8)
+significant_GWAS_genes <- POAG_associated_genes[POAG_associated_genes$pValue <= 5e-8, ]
+split_genes <- significant_GWAS_genes %>%
+  separate_rows(mappedGenes, sep= ",")
+split_genes$mappedGenes <- trimws(split_genes$mappedGenes)
+unique_genes <- unique(split_genes$mappedGenes)
+
+#Find the overlap between the genes we identified and the genes from the GWAS study
+common_genes_6 <- intersect(unique_genes, gene_names_6$SYMBOL)
+common_genes_11 <- intersect(unique_genes, gene_names_11$SYMBOL)
+common_genes <- intersect(common_genes_11, common_genes_6)
+```
 
 
 
