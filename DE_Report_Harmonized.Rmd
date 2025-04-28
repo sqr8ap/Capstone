@@ -1,9 +1,14 @@
 ---
-title: 'DE Full Report: Harmonized First'
+title: 'PCA with Harmonization'
 author: "Sam Remmey, James Siegener, Jacob Turner"
-date: "2025-03-17"
+date: "May 2, 2025"
 output: html_document
 ---
+
+### Background 
+
+"Harmonization" here refers to the process of standardizing or normalizing gene expression data from different sources to make them comparable. In our case, we were hoping to utilize harmonization techniques to mitigate potential batch effects and examine PCA results after applying this additional normalization step. Given the level of contamination present in the data, we believe that more rigorous analytical techniques would be needed to account more fully for the added noise. An extension of this project could include an investigation into these aforementioned analytical techniques. 
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
