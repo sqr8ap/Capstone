@@ -11,4 +11,4 @@ See 'DE_Report.Rmd' for all analyses. Download and open 'DE_Report.html' to view
 
 See 'GeneOverlap.csv' for list of 32 genes differentially expressed in both the 6-sample, high-confidence subset as well as the 11-sample, low-confidence subset. 
 
-'DE_Report_Harmonized' contains limited analyses conducted in an effort to further normalize via harmonization the gene expression data. 
+'DE_Report_Harmonized' contains limited analyses conducted in an effort to further normalize the gene expression data via harmonization. 
