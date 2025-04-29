@@ -7,7 +7,7 @@ Contributors:
 - James Siegener
 - Jacob Turner
 
-See 'DE_Report.Rmd' for all analyses. Download and open 'DE_Report.html' to view all tables and plots generated in 'DE_Report.Rmd'.
+See 'DE_Report.Rmd' for all analyses. See 'DE Full Report.pdf' to view fully rendered version of the report with all tables and figures. 
 
 See 'GeneOverlap.csv' for list of 32 genes differentially expressed in both the 6-sample, high-confidence subset as well as the 11-sample, low-confidence subset. 
 
